@@ -9,13 +9,15 @@ const races = [
 ];
 
 export function CharacterCreation() {
-  const { setGameState } = useGameStore();
+  const { setGameState, setRace, applyRaceStats } = useGameStore();
   const [selectedRace, setSelectedRace] = useState(2); // Default to Midlander
   const [name, setName] = useState("");
 
   const handleStart = () => {
     if (!name) return;
-    setGameState(GameState.PLAYING);
+    setRace(races[selectedRace].name.toLowerCase() as 'northerner' | 'easterner' | 'midlander');
+    applyRaceStats();
+    setGameState(GameState.LOADING);
   };
 
   return (

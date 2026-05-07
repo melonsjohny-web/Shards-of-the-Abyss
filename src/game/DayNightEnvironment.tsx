@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useGameStore } from '../stores/useGameStore';
+import { useGameStore, GameState } from '../stores/useGameStore';
 import { Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import { useRef, useEffect } from 'react';
@@ -10,7 +10,7 @@ export function DayNightEnvironment() {
 
   // Time progresses
   useFrame((_, delta) => {
-    if (gameState === 2) { // PLAYING
+    if (gameState === GameState.PLAYING) { // PLAYING
       // 1 real minute = 30 game minutes
       // 60 seconds real = 0.5 hours game -> 1 sec = 0.00833 hours
       // delta is around 0.016s -> progressing by delta * 0.00833
@@ -61,7 +61,7 @@ export function DayNightEnvironment() {
 
   return (
     <>
-      <ambientLight intensity={timeOfDay > 6 && timeOfDay < 18 ? 0.4 : 0.1} />
+      <ambientLight intensity={timeOfDay > 6 && timeOfDay < 18 ? 0.25 : 0.05} />
       <directionalLight
         ref={dirLightRef}
         castShadow
@@ -83,7 +83,7 @@ export function DayNightEnvironment() {
         rayleigh={timeOfDay > 6 && timeOfDay < 18 ? 1.5 : 0.1}
         turbidity={10}
       />
-      <fog attach="fog" args={['#8fb6d7', 10, 80]} />
+      <fog attach="fog" args={['#3a5a7a', 40, 150]} />
     </>
   );
 }

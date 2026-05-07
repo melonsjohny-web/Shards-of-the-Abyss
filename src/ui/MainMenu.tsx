@@ -1,8 +1,16 @@
 import { useGameStore, GameState } from '../stores/useGameStore';
 import { motion } from 'framer-motion';
+import { sounds } from '../audio/sounds';
 
 export function MainMenu() {
   const { setGameState } = useGameStore();
+
+  const handleStart = (state: GameState) => {
+    if (!sounds.bgm.playing()) {
+      sounds.bgm.play();
+    }
+    setGameState(state);
+  };
 
   return (
     <div className="absolute inset-0 z-50 bg-neutral-950 flex flex-col items-center justify-center relative overflow-hidden">
@@ -31,9 +39,16 @@ export function MainMenu() {
 
       <div className="flex flex-col gap-6 relative z-10 w-72">
         {[
-          { label: "New Game", action: () => setGameState(GameState.CHARACTER_CREATION) },
-          { label: "Load Game", action: () => alert("Not implemented in demo") },
-          { label: "Settings", action: () => alert("Not implemented in demo") },
+          { label: "New Game", action: () => handleStart(GameState.CHARACTER_CREATION) },
+          { label: "Load Game", action: () => {
+              if (useGameStore.getState().loadGame()) {
+                if (!sounds.bgm.playing()) sounds.bgm.play();
+              } else {
+                alert("No save found.");
+              }
+            } 
+          },
+          { label: "Settings", action: () => setGameState(GameState.SETTINGS) },
         ].map((btn, i) => (
           <motion.button
             key={btn.label}

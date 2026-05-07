@@ -2,12 +2,12 @@ import { RigidBody } from '@react-three/rapier';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
-import { useGameStore, GameState } from '../stores/useGameStore';
+import { DialogState, useGameStore, GameState } from '../stores/useGameStore';
 
 interface NPCProps {
   position: [number, number, number];
   name: string;
-  dialogData: Parameters<typeof useGameStore.getState>['currentDialog'];
+  dialogData: DialogState;
 }
 
 export function NPC({ position, name, dialogData }: NPCProps) {
