@@ -6,7 +6,6 @@ import { DayNightEnvironment } from './game/DayNightEnvironment';
 import { NPC } from './game/NPC';
 import { Enemy } from './game/Enemy';
 import { Effects } from './game/Effects';
-import { ViewmodelCanvas } from './game/ViewmodelCanvas';
 import { MainMenuCamera } from './game/MainMenuCamera';
 import { useGameStore, GameState } from './stores/useGameStore';
 import { MainMenu } from './ui/MainMenu';
@@ -19,7 +18,6 @@ import { InventoryScreen } from './ui/InventoryScreen';
 import { LoadingScreen } from './ui/LoadingScreen';
 import { Notifications } from './ui/Notifications';
 import { SettingsMenu } from './ui/SettingsMenu';
-import { KeyboardControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { Suspense, useEffect } from 'react';
 import { sounds } from './audio/sounds';
@@ -71,7 +69,19 @@ const merchantDialog = {
           next: undefined,
           action: () => {
              useGameStore.getState().acceptQuest({ 
-               id: 'wolves', title: 'Wolf Threat', description: 'Kill 3 enemies near the ruins', target: 'enemy', required: 3, current: 0, completed: false, reward: { gold: 100, xp: 150 } 
+               id: 'wolves', 
+               title: 'Wolf Threat', 
+               stages: {
+                 'start': {
+                   id: 'start',
+                   description: 'Clear out the wolves near the old ruins.',
+                   objectives: [{ id: 'kill_wolves', description: 'Kill wolves', target: 'enemy', required: 3, current: 0, completed: false }],
+                   nextStages: [],
+                   reward: { gold: 100, xp: 150 }
+                 }
+               },
+               currentStage: 'start',
+               completed: false
              });
           }
         }
@@ -79,15 +89,6 @@ const merchantDialog = {
     }
   }
 };
-
-const keyboardMap = [
-  { name: 'forward',  keys: ['ArrowUp', 'KeyW'] },
-  { name: 'backward', keys: ['ArrowDown', 'KeyS'] },
-  { name: 'leftward', keys: ['ArrowLeft', 'KeyA'] },
-  { name: 'rightward',keys: ['ArrowRight', 'KeyD'] },
-  { name: 'jump',     keys: ['Space'] },
-  { name: 'run',      keys: ['ShiftLeft'] },
-];
 
 export default function App() {
   const gameState = useGameStore(state => state.gameState);
@@ -140,8 +141,7 @@ export default function App() {
   }, []);
 
   return (
-    <KeyboardControls map={keyboardMap}>
-      <div className="w-screen h-screen bg-black overflow-hidden font-sans relative">
+    <div className="w-screen h-screen bg-black overflow-hidden font-sans relative">
       {/* UI Layers */}
       {gameState === GameState.MAIN_MENU && <MainMenu />}
       {gameState === GameState.CHARACTER_CREATION && <CharacterCreation />}
@@ -159,9 +159,6 @@ export default function App() {
       )}
       
       <DialogUI />
-
-      {/* Viewmodel layer */}
-      {gameState === GameState.PLAYING && <ViewmodelCanvas />}
 
       {/* 3D World */}
       <Canvas 
@@ -193,21 +190,12 @@ export default function App() {
               <World />
               
               {/* Spawn some NPCs */}
-              <NPC position={[5, 0, 5]} name="Elder Marcus" dialogData={elderDialog as any} />
-              <NPC position={[-5, 0, 8]} name="Emil the Merchant" dialogData={merchantDialog as any} />
-
-              {/* Spawn some Enemies */}
-              <Enemy position={[35, 2, -45]} type="skeleton" />
-              <Enemy position={[55, 2, -50]} type="skeleton" />
-              <Enemy position={[48, 2, -60]} type="skeleton" />
-              
-              <Enemy position={[-50, 10, -35]} type="wolf" />
-              <Enemy position={[-65, 10, -45]} type="wolf" />
+              <NPC position={[5, 0, 5]} name="Elder Marcus" getDialog={() => elderDialog as any} />
+              <NPC position={[-5, 0, 8]} name="Emil the Merchant" getDialog={() => merchantDialog as any} />
             </Physics>
           )}
         </Suspense>
       </Canvas>
-      </div>
-    </KeyboardControls>
+    </div>
   );
 }

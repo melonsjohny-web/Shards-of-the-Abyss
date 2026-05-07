@@ -15,7 +15,7 @@ export function DayNightEnvironment() {
       // 60 seconds real = 0.5 hours game -> 1 sec = 0.00833 hours
       // delta is around 0.016s -> progressing by delta * 0.00833
       // let's speed it up a little bit for the demo: 1 real sec = 1 game hour -> delta * 1
-      setTimeOfDay((timeOfDay + delta * 0.5) % 24);
+      setTimeOfDay((timeOfDay + delta * 0.02) % 24);
     }
 
     if (dirLightRef.current) {

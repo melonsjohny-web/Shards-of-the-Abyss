@@ -47,6 +47,49 @@ function Minimap() {
   );
 }
 
+function WeaponHUD() {
+  const [isAttacking, setIsAttacking] = useState(false);
+
+  useEffect(() => {
+    const onAttack = () => {
+      setIsAttacking(true);
+      setTimeout(() => setIsAttacking(false), 250);
+    };
+    window.addEventListener('player-attack', onAttack);
+    return () => window.removeEventListener('player-attack', onAttack);
+  }, []);
+
+  return (
+    <div className="absolute -bottom-20 right-[5%] w-[300px] h-[500px] pointer-events-none z-0 origin-bottom-right">
+      <motion.div
+        animate={
+          isAttacking
+            ? { rotate: -60, x: -100, y: 50, scale: 1.1 }
+            : { rotate: 10, x: 0, y: 0, scale: 1 }
+        }
+        transition={{ duration: 0.15 }}
+        style={{ originX: 0.5, originY: 1, width: '100%', height: '100%' }}
+      >
+        <svg viewBox="0 0 100 400" className="w-full h-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
+          {/* Blade base */}
+          <path d="M40,280 L60,280 L55,50 L50,20 L45,50 Z" fill="#9ca3af" />
+          {/* Blade highlight */}
+          <path d="M50,20 L55,50 L50,280 Z" fill="#d1d5db" />
+          {/* Crossguard */}
+          <rect x="25" y="280" width="50" height="15" rx="2" fill="#374151" />
+          <path d="M25,280 L75,280 L70,295 L30,295 Z" fill="#1f2937" />
+          {/* Grip */}
+          <rect x="42" y="295" width="16" height="70" fill="#78350f" />
+          <path d="M42,295 L50,295 L50,365 L42,365 Z" fill="#92400e" />
+          {/* Pommel */}
+          <circle cx="50" cy="375" r="12" fill="#374151" />
+          <circle cx="50" cy="375" r="6" fill="#fbbf24" />
+        </svg>
+      </motion.div>
+    </div>
+  );
+}
+
 export function HUD() {
   const { gameState, health, maxHealth, stamina, maxStamina, mana, maxMana, interactionPrompt, timeOfDay, quests, level, xp, xpToNextLevel } = useGameStore();
   const angle = useCameraAngle();
@@ -103,13 +146,21 @@ export function HUD() {
 
       {/* Top Right: Quests */}
       <div className="absolute top-6 right-6 flex flex-col gap-2 max-w-xs">
-        {activeQuests.map(q => (
+        {activeQuests.map(q => {
+          const stage = q.stages[q.currentStage];
+          if (!stage) return null;
+          return (
           <div key={q.id} className="bg-black/60 border border-amber-900/30 p-3 font-serif backdrop-blur-sm shadow-xl">
             <div className="text-amber-400 text-sm font-bold">{q.title}</div>
-            <div className="text-neutral-300 text-xs mt-1 leading-relaxed">{q.description}</div>
-            <div className="text-amber-600 text-xs mt-2 font-bold tracking-widest">{q.current}/{q.required}</div>
+            <div className="text-neutral-300 text-xs mt-1 leading-relaxed">{stage.description}</div>
+            {stage.objectives.map(obj => (
+            <div key={obj.id} className="text-amber-600 text-xs mt-2 font-bold tracking-widest flex justify-between">
+              <span>{obj.description}</span>
+              <span>{obj.current}/{obj.required}</span>
+            </div>
+            ))}
           </div>
-        ))}
+        )})}
       </div>
 
       {/* Center: Crosshair & Interaction */}
@@ -203,7 +254,7 @@ export function HUD() {
       </div>
       
       {/* Bottom Right: Quick slots */}
-      <div className="absolute bottom-6 right-6 flex gap-2">
+      <div className="absolute bottom-6 right-6 flex gap-2 z-10">
         {[1, 2, 3, 4].map((slot) => (
           <div key={slot} className="w-12 h-12 bg-neutral-900/80 border-2 border-neutral-700 rounded-sm flex items-center justify-center relative shadow-lg">
             <span className="absolute top-0.5 left-1 text-[10px] text-neutral-400 font-bold">{slot}</span>
@@ -211,6 +262,8 @@ export function HUD() {
           </div>
         ))}
       </div>
+
+      <WeaponHUD />
     </div>
   );
 }

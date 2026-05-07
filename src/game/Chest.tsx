@@ -16,9 +16,13 @@ export function Chest({ position, loot, gold }: ChestProps) {
   const { addItem, addGold, setInteractionPrompt, gameState } = useGameStore();
   const meshRef = useRef<THREE.Mesh>(null);
 
+  // Use a ref for world position to avoid reallocation
+  const wp = useRef(new THREE.Vector3());
+
   useFrame(() => {
     if (!meshRef.current || gameState !== GameState.PLAYING) return;
-    const dist = camera.position.distanceTo(meshRef.current.position);
+    meshRef.current.getWorldPosition(wp.current);
+    const dist = camera.position.distanceTo(wp.current);
     if (dist < 3 && !opened) setInteractionPrompt('Open chest [E]');
     else if (dist < 3.2 && !opened) setInteractionPrompt(null);
   });
@@ -28,7 +32,8 @@ export function Chest({ position, loot, gold }: ChestProps) {
       if (gameState !== GameState.PLAYING) return;
       if (e.code !== 'KeyE' || opened) return;
       if (!meshRef.current) return;
-      const dist = camera.position.distanceTo(meshRef.current.position);
+      meshRef.current.getWorldPosition(wp.current);
+      const dist = camera.position.distanceTo(wp.current);
       if (dist > 3) return;
       
       setOpened(true);

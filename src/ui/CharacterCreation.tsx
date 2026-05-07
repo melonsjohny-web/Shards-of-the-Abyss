@@ -17,6 +17,41 @@ export function CharacterCreation() {
     if (!name) return;
     setRace(races[selectedRace].name.toLowerCase() as 'northerner' | 'easterner' | 'midlander');
     applyRaceStats();
+
+    // Give Starting weapon
+    let wpnName = "Basic Sword";
+    if (selectedRace === 0) wpnName = "Iron Sword";
+    if (selectedRace === 1) wpnName = "Curved Blade";
+    
+    useGameStore.getState().addItem({
+      id: 'start_wpn',
+      name: wpnName,
+      type: 'weapon',
+      rarity: 'common',
+      stackable: false,
+      quantity: 1,
+      description: 'A basic weapon.',
+      icon: '🗡️',
+      value: 10,
+      stats: { damage: selectedRace === 2 ? 10 : 15 }
+    });
+
+    useGameStore.getState().equipItem(0, 'weapon'); // Attempt to auto-equip
+
+    // Give some basic potions
+    useGameStore.getState().addItem({
+      id: 'hp_start',
+      name: 'HP Potion',
+      type: 'consumable',
+      rarity: 'common',
+      stackable: true,
+      quantity: 3,
+      description: 'Restores 30 Health.',
+      icon: '💊',
+      value: 15,
+      stats: { health: 30 }
+    });
+
     setGameState(GameState.LOADING);
   };
 

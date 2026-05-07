@@ -1,59 +1,82 @@
 import { RigidBody } from '@react-three/rapier';
-import { useFrame, useThree } from '@react-three/fiber';
 import { useRef, useState, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { Billboard, Text } from '@react-three/drei';
 import * as THREE from 'three';
-import { DialogState, useGameStore, GameState } from '../stores/useGameStore';
+import { useGameStore, GameState, DialogState } from '../stores/useGameStore';
+import { getTerrainHeight } from './terrainUtils';
 
-interface NPCProps {
-  position: [number, number, number];
-  name: string;
-  dialogData: DialogState;
-}
-
-export function NPC({ position, name, dialogData }: NPCProps) {
-  const meshRef = useRef<THREE.Mesh>(null);
+export function NPC({ position, name, getDialog }: { position: [number, number, number], name: string, getDialog: () => DialogState }) {
   const { camera } = useThree();
-  const { setInteractionPrompt, setDialog, gameState } = useGameStore();
-  const [isNear, setIsNear] = useState(false);
+  const { setDialog, currentDialog, setInteractionPrompt, gameState } = useGameStore();
+  const [hovered, setHovered] = useState(false);
+  const bodyRef = useRef<any>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
+  
+  // Stick to terrain 
+  // Normally physics does this, but for static NPCs we can just set Y.
+  const y = getTerrainHeight(position[0], position[2]);
 
-  // Check distance to player
   useFrame(() => {
     if (!meshRef.current || gameState !== GameState.PLAYING) return;
     
-    const dist = camera.position.distanceTo(meshRef.current.position);
-    const near = dist < 4;
+    // Get true world pos of mesh
+    const wp = new THREE.Vector3();
+    meshRef.current.getWorldPosition(wp);
     
-    if (near !== isNear) {
-      setIsNear(near);
-      if (near) {
-        setInteractionPrompt('Talk to ' + name);
-      } else {
+    const dist = camera.position.distanceTo(wp);
+    if (dist < 4) {
+      if (!hovered) {
+        setHovered(true);
+        setInteractionPrompt(`Talk to ${name} [E]`);
+      }
+    } else {
+      if (hovered) {
+        setHovered(false);
         setInteractionPrompt(null);
       }
     }
   });
 
-  // Handle interaction key
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'KeyE' && isNear && gameState === GameState.PLAYING) {
-        setDialog(dialogData);
-        setInteractionPrompt(null);
-        // We probably also need a way to release pointer lock here 
-        // since we enter UI
-        document.exitPointerLock?.();
+    const handleKey = (e: KeyboardEvent) => {
+      // Very simple 'E' to interact.
+      if (e.code === 'KeyE' && hovered && gameState === GameState.PLAYING) {
+         // Create a simple beep using Web Audio API for mumble effect
+         try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(150 + Math.random() * 50, ctx.currentTime);
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.1);
+         } catch(err) {}
+
+         setDialog(getDialog());
+         setInteractionPrompt(null);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isNear, gameState, dialogData, setDialog, setInteractionPrompt]);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [hovered, gameState, getDialog, setDialog, setInteractionPrompt]);
 
   return (
-    <RigidBody type="fixed" colliders="cuboid" position={position}>
-      <mesh ref={meshRef} castShadow receiveShadow position={[0, 1, 0]}>
-        <capsuleGeometry args={[0.5, 1]} />
-        <meshStandardMaterial color="#4a708b" />
+    <RigidBody type="fixed" colliders="cuboid" position={[position[0], y + 1, position[2]]}>
+      <mesh ref={meshRef} castShadow receiveShadow>
+        <capsuleGeometry args={[0.4, 0.8, 4, 8]} />
+        <meshStandardMaterial color="#88aaff" roughness={0.8} />
       </mesh>
+      
+      <Billboard position={[0, 1.2, 0]}>
+        <Text fontSize={0.3} color="white" outlineWidth={0.02} outlineColor="black" anchorY="bottom">
+          {name}
+        </Text>
+      </Billboard>
     </RigidBody>
   );
 }

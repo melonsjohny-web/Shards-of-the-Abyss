@@ -23,23 +23,47 @@ export type DialogState = {
   currentNode: string;
 } | null;
 
+export type QuestObjective = {
+  id: string;
+  description: string;
+  target: string;
+  required: number;
+  current: number;
+  completed: boolean;
+};
+
+export type QuestStage = {
+  id: string;
+  description: string;
+  objectives: QuestObjective[];
+  nextStages: string[];
+  reward?: { gold: number; xp: number };
+};
+
 export type Quest = {
   id: string;
   title: string;
-  description: string;
-  target: string;       // target type, e.g., 'enemy'
-  required: number;     // amount to reach
-  current: number;      // current progress
+  stages: Record<string, QuestStage>;
+  currentStage: string;
   completed: boolean;
-  reward: { gold: number; xp: number };
 };
 
+export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export type InventoryItem = {
   id: string;
   name: string;
-  type: 'weapon' | 'armor' | 'consumable';
+  type: 'weapon' | 'armor' | 'consumable' | 'quest' | 'material';
+  rarity: ItemRarity;
   value: number;
-  stats?: { damage?: number; defense?: number; health?: number };
+  stackable: boolean;
+  quantity: number;
+  stats?: {
+    damage?: number; defense?: number; health?: number;
+    stamina?: number; mana?: number;
+    critChance?: number; attackSpeed?: number;
+  };
+  description: string;
+  icon: string;
 };
 
 interface GameStore {
@@ -71,8 +95,17 @@ interface GameStore {
   interactionPrompt: string | null;
   setInteractionPrompt: (prompt: string | null) => void;
 
-  inventory: InventoryItem[];
+  inventory: (InventoryItem | null)[];
   gold: number;
+  equipment: {
+    head: InventoryItem | null;
+    body: InventoryItem | null;
+    weapon: InventoryItem | null;
+    legs: InventoryItem | null;
+  };
+  equipItem: (invIndex: number, slot: keyof GameStore['equipment']) => void;
+  unequipItem: (slot: keyof GameStore['equipment']) => void;
+  moveItem: (fromIndex: number, toIndex: number) => void;
   addGold: (amount: number) => void;
   addItem: (item: InventoryItem) => void;
 
@@ -82,6 +115,7 @@ interface GameStore {
   addXP: (amount: number) => void;
 
   quests: Quest[];
+  completedQuests: string[];
   acceptQuest: (quest: Quest) => void;
   updateQuestProgress: (target: string, amount: number) => void;
 
@@ -145,32 +179,137 @@ export const useGameStore = create<GameStore>((set, get) => ({
   interactionPrompt: null,
   setInteractionPrompt: (prompt) => set({ interactionPrompt: prompt }),
 
-  inventory: [],
+  inventory: new Array(25).fill(null),
+  equipment: { head: null, body: null, weapon: null, legs: null },
+  
+  equipItem: (invIndex, slot) => set((state) => {
+    const item = state.inventory[invIndex];
+    if (!item) return state; // nothing to equip
+    
+    // Check type matching
+    if (slot === 'weapon' && item.type !== 'weapon') return state;
+    if (slot !== 'weapon' && item.type !== 'armor') return state;
+    
+    const newInv = [...state.inventory];
+    const currentEquipped = state.equipment[slot];
+    
+    // Swap
+    newInv[invIndex] = currentEquipped;
+    const newEq = { ...state.equipment, [slot]: item };
+    return { inventory: newInv, equipment: newEq };
+  }),
+  
+  unequipItem: (slot) => set((state) => {
+    const item = state.equipment[slot];
+    if (!item) return state;
+    
+    const emptyIdx = state.inventory.findIndex(i => i === null);
+    if (emptyIdx === -1) {
+      state.addNotification('Inventory is full!', 'info');
+      return state;
+    }
+    
+    const newInv = [...state.inventory];
+    newInv[emptyIdx] = item;
+    const newEq = { ...state.equipment, [slot]: null };
+    return { inventory: newInv, equipment: newEq };
+  }),
+  
+  moveItem: (fromIndex, toIndex) => set((state) => {
+    const newInv = [...state.inventory];
+    const temp = newInv[fromIndex];
+    newInv[fromIndex] = newInv[toIndex];
+    newInv[toIndex] = temp;
+    return { inventory: newInv };
+  }),
+
   gold: 0,
   addGold: (amount) => set((state) => {
     state.addNotification(`Received ${amount} gold`, 'reward');
     return { gold: state.gold + amount };
   }),
   addItem: (item) => set((state) => {
+    const emptyIdx = state.inventory.findIndex(i => i === null);
+    if (emptyIdx === -1) {
+       state.addNotification(`Inventory full! Could not loot ${item.name}`, 'info');
+       return state;
+    }
     state.addNotification(`Obtained: ${item.name}`, 'reward');
-    return { inventory: [...state.inventory, item] };
+    const newInv = [...state.inventory];
+    newInv[emptyIdx] = item;
+    return { inventory: newInv };
   }),
 
   quests: [],
+  completedQuests: [],
   acceptQuest: (quest) => set((state) => ({ quests: [...state.quests, quest] })),
-  updateQuestProgress: (target, amount) => set((state) => ({
-    quests: state.quests.map(q => {
-      if (q.target !== target || q.completed) return q;
-      const current = Math.min(q.required, q.current + amount);
-      const completed = current >= q.required;
-      if (completed) {
-        state.addGold(q.reward.gold);
-        state.addXP(q.reward.xp);
-        return { ...q, current, completed };
+  updateQuestProgress: (target, amount) => set((state) => {
+    let goldReward = 0;
+    let xpReward = 0;
+    const completedIds: string[] = [];
+    
+    const newQuests = state.quests.map(q => {
+      if (q.completed) return q;
+      
+      const stage = q.stages[q.currentStage];
+      let stageCompleted = true;
+      
+      const newObjectives = stage.objectives.map(obj => {
+        if (obj.target === target && !obj.completed) {
+          const current = Math.min(obj.required, obj.current + amount);
+          const completed = current >= obj.required;
+          if (!completed) stageCompleted = false;
+          return { ...obj, current, completed };
+        }
+        if (!obj.completed) stageCompleted = false;
+        return obj;
+      });
+
+      if (stageCompleted) {
+        if (stage.reward) {
+          goldReward += stage.reward.gold;
+          xpReward += stage.reward.xp;
+        }
+        // Advance stage or complete
+        if (stage.nextStages && stage.nextStages.length > 0) {
+          return {
+            ...q,
+            currentStage: stage.nextStages[0],
+            stages: {
+              ...q.stages,
+              [q.currentStage]: { ...stage, objectives: newObjectives }
+            }
+          };
+        } else {
+          completedIds.push(q.id);
+          return {
+             ...q,
+             completed: true,
+             stages: {
+              ...q.stages,
+              [q.currentStage]: { ...stage, objectives: newObjectives }
+            }
+          };
+        }
       }
-      return { ...q, current };
-    })
-  })),
+
+      return {
+        ...q,
+        stages: {
+          ...q.stages,
+          [q.currentStage]: { ...stage, objectives: newObjectives }
+        }
+      };
+    });
+
+    if (goldReward > 0) state.addGold(goldReward);
+    if (xpReward > 0) state.addXP(xpReward);
+
+    return { 
+      quests: newQuests,
+      completedQuests: [...state.completedQuests, ...completedIds]
+    };
+  }),
 
   notifications: [],
   addNotification: (text, type = 'info') => set((state) => ({

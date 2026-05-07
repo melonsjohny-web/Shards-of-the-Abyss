@@ -6,13 +6,16 @@ export function Notifications() {
   const { notifications, removeNotification } = useGameStore();
 
   useEffect(() => {
+    // If there's a new notification, start its timer
+    // To avoid resetting timers, we only set a timer for the latest notification
     if (notifications.length > 0) {
-      const timers = notifications.map(n => 
-        setTimeout(() => removeNotification(n.id), 3000)
-      );
-      return () => timers.forEach(clearTimeout);
+      const latest = notifications[notifications.length - 1];
+      const timer = setTimeout(() => {
+        removeNotification(latest.id);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-  }, [notifications, removeNotification]);
+  }, [notifications.length, removeNotification]);
 
   return (
     <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none items-end">

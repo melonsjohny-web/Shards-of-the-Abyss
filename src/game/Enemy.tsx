@@ -73,7 +73,7 @@ export function Enemy({ position, type = 'goblin' }: { position: [number, number
   
   const lastAttack = useRef(0);
   const [dead, setDead] = useState(false);
-  const [damageNumbers, setDamageNumbers] = useState<{id: number, value: number, y: number}[]>([]);
+  const [damageNumbers, setDamageNumbers] = useState<{id: number, value: number, y: number, startX: number, startY: number, startZ: number}[]>([]);
 
   useFrame((state, delta) => {
     if (damageNumbers.length > 0) {
@@ -150,12 +150,22 @@ export function Enemy({ position, type = 'goblin' }: { position: [number, number
   const takeDamage = (amount: number = 15) => {
     if (gameState !== GameState.PLAYING || dead) return;
     
-    sounds.hit.play();
+    // sounds.hit.play(); // disable annoyng sound
     const newHealth = Math.max(0, health - amount);
     setHealth(newHealth);
     
+    let currentX = position[0];
+    let currentY = position[1];
+    let currentZ = position[2];
+    if (bodyRef.current) {
+      const pos = bodyRef.current.translation();
+      currentX = pos.x;
+      currentY = pos.y;
+      currentZ = pos.z;
+    }
+    
     const dId = Date.now() + Math.random();
-    setDamageNumbers(prev => [...prev, { id: dId, value: amount, y: 0 }]);
+    setDamageNumbers(prev => [...prev, { id: dId, value: amount, y: 0, startX: currentX, startY: currentY, startZ: currentZ }]);
     setTimeout(() => {
       setDamageNumbers(prev => prev.filter(dn => dn.id !== dId));
     }, 1000);
@@ -165,8 +175,11 @@ export function Enemy({ position, type = 'goblin' }: { position: [number, number
 
     if (bodyRef.current) {
       bodyRef.current.applyImpulse({ x: 0, y: 2, z: -1 }, true);
-      const pos = bodyRef.current.translation();
-      setHitParticles(prev => [...prev, { id: Date.now() + Math.random(), pos: new THREE.Vector3(pos.x, pos.y, pos.z) }]);
+      const pId = Date.now() + Math.random();
+      setHitParticles(prev => [...prev, { id: pId, pos: new THREE.Vector3(currentX, currentY, currentZ) }]);
+      setTimeout(() => {
+         setHitParticles(prev => prev.filter(p => p.id !== pId));
+      }, 500);
     }
     
     if (newHealth <= 0 && !dead) {
@@ -176,7 +189,7 @@ export function Enemy({ position, type = 'goblin' }: { position: [number, number
       store.addXP(cfg.xp);
       store.addGold(Math.floor(Math.random() * 15) + 5);
       if (Math.random() < 0.3) {
-        store.addItem({ id: 'health_potion', name: 'Health Potion', type: 'consumable', value: 20, stats: { health: 30 } });
+        store.addItem({ id: 'health_potion_' + Date.now(), name: 'Health Potion', type: 'consumable', rarity: 'common', stackable: true, quantity: 1, description: 'Restores 30 Health.', icon: '💊', value: 20, stats: { health: 30 } });
       }
       
       // Cleanup minimap
@@ -209,7 +222,7 @@ export function Enemy({ position, type = 'goblin' }: { position: [number, number
         </RigidBody>
       )}
       {damageNumbers.map(dn => (
-        <Billboard key={dn.id} position={[position[0], position[1] + cfg.size[1] + 1 + dn.y, position[2]]}>
+        <Billboard key={dn.id} position={[dn.startX, dn.startY + cfg.size[1] + 1 + dn.y, dn.startZ]}>
           <Text color="yellow" fontSize={0.6} font="https://fonts.gstatic.com/s/cinzel/v19/8vIJ7ww63mVu7gtR-kwk.woff" outlineWidth={0.05} outlineColor="#000000">
             -{dn.value}
           </Text>
